@@ -1,0 +1,38 @@
+// Esquema Prisma do aplicativo Glicemia.
+// Modela as medições de glicemia associadas a um usuário autenticado pelo Supabase Auth.
+// As datas são persistidas como timestamptz (instante UTC) para evitar ambiguidades de fuso horário.
+
+generator client {
+  // Prisma 7 utiliza o gerador "prisma-client" e exige um diretório de saída explícito.
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // A URL de conexão é fornecida pelo prisma7.config.ts (DATABASE_URL ou DIRECT_URL).
+}
+
+/// Contexto em que a medição de glicemia foi realizada.
+enum GlucoseContext {
+  jejum
+  antes_refeicao
+  depois_refeicao
+  ao_deitar
+  outro
+}
+
+/// Registro de uma medição de glicemia realizada com glicosímetro de ponta de dedo.
+model GlucoseReading {
+  id          String          @id @default(uuid()) @db.Uuid
+  userId      String
+  measuredAt  DateTime        @db.Timestamptz(3)
+  glucoseMgDl Int
+  context     GlucoseContext
+  notes       String?         @db.VarChar(1000)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
+
+  // Índice para consultas frequentes por usuário e data, da mais recente para a mais antiga.
+  @@index([userId, measuredAt(sort: Desc)])
+}
