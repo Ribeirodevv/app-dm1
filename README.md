@@ -12,7 +12,7 @@ Este aplicativo é um diário de registros. Não realiza diagnósticos, não rec
 - Tailwind CSS 4
 - Prisma 7
 - Neon PostgreSQL
-- Supabase Auth
+- Autenticação própria (Argon2id + sessões no Neon)
 - Zod
 - Recharts
 - Vitest
@@ -21,7 +21,7 @@ Este aplicativo é um diário de registros. Não realiza diagnósticos, não rec
 
 - Node.js 20 ou superior
 - npm
-- Conta no Supabase (Auth)
+- Nenhuma conta externa de autenticação (autenticação própria)
 - Banco PostgreSQL no Neon
 
 ## Instalação
@@ -30,11 +30,24 @@ Este aplicativo é um diário de registros. Não realiza diagnósticos, não rec
 npm install
 ```
 
-## Configuração do Supabase Auth
+## Autenticação própria
 
-1. Crie um projeto no Supabase.
-2. Em Authentication, habilite o provedor de e-mail/senha.
-3. Copie a URL do projeto e a chave anônima (anon key) para as variáveis `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+A autenticação é realizada no servidor com senhas armazenadas como hash Argon2id no Neon.
+
+Para criar o primeiro usuário (Thiago):
+
+1. Defina `BOOTSTRAP_TOKEN` no `.env.local`.
+2. Com o servidor em execução, envie uma requisição POST para `/api/bootstrap` com o token e as credenciais desejadas:
+
+```bash
+curl -X POST http://localhost:3000/api/bootstrap ^
+  -H "Content-Type: application/json" ^
+  -d "{\"token\":\"SEU_TOKEN\",\"email\":\"thiago@exemplo.com\",\"password\":\"SenhaForte123!\",\"name\":\"Thiago\"}"
+```
+
+O bootstrap só funciona quando não existem usuários cadastrados. A rota deve ser desabilitada em produção após o uso (removendo `BOOTSTRAP_TOKEN`).
+
+Recuperação de acesso: redefina a senha por um procedimento administrativo documentado (execução controlada de um script ou atualização direta do hash no banco), nunca expondo senhas em logs.
 
 ## Configuração do banco Neon
 
@@ -54,8 +67,7 @@ Variáveis:
 
 - `DATABASE_URL`: conexão usada pelo aplicativo em tempo de execução (pode usar pooler do Neon).
 - `DIRECT_URL`: conexão direta usada pelas migrações do Prisma (sem pooler).
-- `NEXT_PUBLIC_SUPABASE_URL`: URL pública do projeto Supabase.
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: chave anônima pública do Supabase.
+- `BOOTSTRAP_TOKEN`: token para criar o primeiro usuário (usar uma vez e remover).
 
 ## Prisma
 
@@ -125,6 +137,6 @@ Implante em uma plataforma compatível com Next.js (ex.: Vercel). Configure as v
 ## Decisões arquiteturais
 
 - Prisma 7 com adaptador Neon (`@prisma/adapter-neon`) e `@neondatabase/serverless`.
-- Supabase Auth exclusivamente para autenticação; dados ficam no Neon.
+- Autenticação própria (Argon2id + sessões no Neon) exclusivamente para autenticação; dados ficam no Neon.
 - Datas persistidas como `timestamptz` (instante UTC).
 - Comentários em português brasileiro em todo o código.

@@ -1,16 +1,53 @@
 // Esquema Prisma do aplicativo Glicemia.
-// Modela as medições de glicemia associadas a um usuário autenticado pelo Supabase Auth.
-// As datas são persistidas como timestamptz (instante UTC) para evitar ambiguidades de fuso horário.
+// Modela usuários, sessões e medições de glicemia no Neon PostgreSQL.
+// As datas são persistidas como timestamptz (instante UTC).
 
 generator client {
-  // Prisma 7 utiliza o gerador "prisma-client" e exige um diretório de saída explícito.
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  // A URL de conexão é fornecida pelo prisma7.config.ts (DATABASE_URL ou DIRECT_URL).
+}
+
+/// Usuário autenticado da aplicação.
+model User {
+  id           String          @id @default(uuid()) @db.Uuid
+  name         String
+  email        String          @unique
+  passwordHash String
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime        @updatedAt @db.Timestamptz(3)
+
+  sessions     Session[]
+  readings     GlucoseReading[]
+
+  @@index([email])
+}
+
+/// Sessão persistida no banco. Apenas o hash do token é armazenado.
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Registro de tentativas de autenticação para limitação de taxa.
+model AuthAttempt {
+  id         String   @id @default(uuid()) @db.Uuid
+  identifier String
+  success    Boolean
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([identifier, createdAt])
 }
 
 /// Contexto em que a medição de glicemia foi realizada.
@@ -25,7 +62,7 @@ enum GlucoseContext {
 /// Registro de uma medição de glicemia realizada com glicosímetro de ponta de dedo.
 model GlucoseReading {
   id          String          @id @default(uuid()) @db.Uuid
-  userId      String
+  userId      String          @db.Uuid
   measuredAt  DateTime        @db.Timestamptz(3)
   glucoseMgDl Int
   context     GlucoseContext
@@ -33,6 +70,7 @@ model GlucoseReading {
   createdAt   DateTime        @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
 
-  // Índice para consultas frequentes por usuário e data, da mais recente para a mais antiga.
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, measuredAt(sort: Desc)])
 }

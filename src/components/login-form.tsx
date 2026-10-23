@@ -1,20 +1,18 @@
-// Formulário de autenticação (login e cadastro) usando Supabase Auth.
-// Toda a autenticação ocorre via Supabase; este componente apenas coleta credenciais.
+// Formulário de login usando autenticação própria no servidor.
 
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { criarClienteSupabaseNavegador } from "@/lib/supabase/client";
+import { loginAction } from "@/app/actions/auth";
 
 /**
- * Formulário de login/cadastro por e-mail e senha.
+ * Formulário de login por e-mail e senha.
  */
 export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [modoCadastro, setModoCadastro] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
 
@@ -22,29 +20,19 @@ export function LoginForm() {
     event.preventDefault();
     setCarregando(true);
     setMensagem(null);
-    const supabase = criarClienteSupabaseNavegador();
 
-    if (modoCadastro) {
-      const { error } = await supabase.auth.signUp({ email, password: senha });
-      if (error) {
-        setMensagem(error.message);
-      } else {
-        setMensagem("Conta criada. Verifique seu e-mail, se necessário, e faça login.");
-      }
+    const resultado = await loginAction({ email, password: senha });
+    if (resultado.sucesso) {
+      router.push("/dashboard");
+      router.refresh();
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-      if (error) {
-        setMensagem("E-mail ou senha inválidos.");
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
+      setMensagem(resultado.mensagem ?? "Erro ao entrar.");
     }
     setCarregando(false);
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" aria-label="Formulário de autenticação">
+    <form onSubmit={handleSubmit} className="space-y-4" aria-label="Formulário de login">
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700">
           E-mail
@@ -66,7 +54,6 @@ export function LoginForm() {
           id="senha"
           type="password"
           required
-          minLength={6}
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -82,14 +69,7 @@ export function LoginForm() {
         disabled={carregando}
         className="w-full rounded-md bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
       >
-        {carregando ? "Aguarde..." : modoCadastro ? "Criar conta" : "Entrar"}
-      </button>
-      <button
-        type="button"
-        onClick={() => setModoCadastro((v) => !v)}
-        className="w-full text-sm text-blue-600 hover:underline"
-      >
-        {modoCadastro ? "Já tem conta? Entrar" : "Não tem conta? Criar conta"}
+        {carregando ? "Aguarde..." : "Entrar"}
       </button>
     </form>
   );

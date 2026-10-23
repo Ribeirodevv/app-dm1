@@ -1,68 +1,40 @@
-// Middleware do Next.js para atualizar a sessão do Supabase e proteger rotas privadas.
-// Rotas sem sessão válida são redirecionadas para a tela de login.
+// Middleware do Next.js para proteger rotas privadas com base na presença do cookie de sessão.
+// A validação completa da sessão ocorre no servidor em cada operação sensível.
 
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { NOME_COOKIE_SESSAO } from "@/lib/auth/constants";
 
-// Rotas que exigem autenticação.
-const ROTAS_PROTEGIDAS = ["/dashboard", "/readings", "/export"];
+const ROTAS_PROTEGIDAS = ["/dashboard", "/readings"];
 
 /**
- * Atualiza a sessão do usuário e aplica a proteção de rotas.
+ * Aplica a proteção de rotas com base no cookie de sessão.
  *
  * @param request Requisição HTTP recebida.
- * @returns Resposta com cookies atualizados ou redirecionamento.
+ * @returns Resposta com redirecionamento quando necessário.
  */
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const caminho = request.nextUrl.pathname;
   const protegida = ROTAS_PROTEGIDAS.some((rota) => caminho.startsWith(rota));
+  const possuiCookie = Boolean(request.cookies.get(NOME_COOKIE_SESSAO)?.value);
 
-  if (!user && protegida) {
+  if (protegida && !possuiCookie) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", caminho);
     return NextResponse.redirect(url);
   }
 
-  if (user && caminho === "/login") {
+  if (!protegida && caminho === "/login" && possuiCookie) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    // Executa em todas as rotas, exceto arquivos estáticos e imagens.
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

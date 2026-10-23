@@ -1,29 +1,34 @@
 // Utilitário de autenticação para Server Components e Server Actions.
-// A identidade sempre é obtida da sessão validada pelo Supabase, nunca de parâmetros do cliente.
+// A identidade é obtida da sessão persistida no banco, validada no servidor.
 
-import { criarClienteSupabaseServidor } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { NOME_COOKIE_SESSAO } from "@/lib/auth/constants";
+import { validarSessao } from "@/lib/auth/session";
+
+export type UsuarioAutenticado = {
+  id: string;
+  name: string;
+  email: string;
+};
 
 /**
  * Obtém o usuário autenticado da sessão atual.
  *
- * @returns Objeto do usuário do Supabase ou null quando não houver sessão válida.
+ * @returns Usuário autenticado ou null.
  */
-export async function obterUsuarioAutenticado() {
-  const supabase = await criarClienteSupabaseServidor();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+export async function obterUsuarioAutenticado(): Promise<UsuarioAutenticado | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(NOME_COOKIE_SESSAO)?.value;
+  return validarSessao(token);
 }
 
 /**
  * Exige um usuário autenticado, lançando erro quando ausente.
- * Deve ser usado em operações privadas do servidor.
  *
  * @returns Usuário autenticado.
  * @throws Error quando não houver sessão válida.
  */
-export async function exigirUsuarioAutenticado() {
+export async function exigirUsuarioAutenticado(): Promise<UsuarioAutenticado> {
   const usuario = await obterUsuarioAutenticado();
   if (!usuario) {
     throw new Error("Não autenticado.");
