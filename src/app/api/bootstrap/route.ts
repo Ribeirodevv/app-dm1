@@ -9,9 +9,7 @@ import { criarPrimeiroUsuario } from "@/services/users";
 const bootstrapSchema = z.object({
   token: z.string().min(1),
   email: z.string().email(),
-  // A senha mínima é flexível no bootstrap (ação administrativa controlada).
-  // Em produção, utilize senhas fortes e remova este endpoint após o uso.
-  password: z.string().min(1, "Informe a senha."),
+  password: z.string().min(8, "A senha deve ter ao menos 8 caracteres."),
   name: z.string().min(1).optional(),
 });
 

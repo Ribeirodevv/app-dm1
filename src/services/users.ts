@@ -24,16 +24,21 @@ export async function buscarUsuarioPorEmail(email: string) {
  * @returns Usuário criado.
  */
 export async function criarPrimeiroUsuario(nome: string, email: string, senha: string) {
-  const total = await prisma.user.count();
-  if (total > 0) {
-    throw new Error("A aplicação já foi inicializada.");
-  }
-  const passwordHash = await gerarHashSenha(senha);
-  return prisma.user.create({
-    data: {
-      name: nome,
-      email: email.trim().toLowerCase(),
-      passwordHash,
+  return prisma.$transaction(
+    async (tx) => {
+      const total = await tx.user.count();
+      if (total > 0) {
+        throw new Error("A aplicação já foi inicializada.");
+      }
+      const passwordHash = await gerarHashSenha(senha);
+      return tx.user.create({
+        data: {
+          name: nome,
+          email: email.trim().toLowerCase(),
+          passwordHash,
+        },
+      });
     },
-  });
+    { isolationLevel: "Serializable" }
+  );
 }
