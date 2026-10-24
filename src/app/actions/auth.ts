@@ -2,7 +2,7 @@
 
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -37,16 +37,23 @@ export async function loginAction(entrada: unknown): Promise<ResultadoAuth> {
 
   const email = validado.data.email.trim().toLowerCase();
   const senha = validado.data.password;
-  const identificador = email;
 
-  if (await estaBloqueado(identificador)) {
+  const headerStore = await headers();
+  const ip =
+    headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    headerStore.get("x-real-ip") ||
+    "desconhecido";
+
+  // Limita por e-mail e por origem (IP), sem confiar cegamente em cabeçalhos.
+  if (await estaBloqueado(email) || await estaBloqueado(ip)) {
     return { sucesso: false, mensagem: "Muitas tentativas. Tente novamente mais tarde." };
   }
 
   const usuario = await buscarUsuarioPorEmail(email);
   const senhaValida = usuario ? await verificarSenha(senha, usuario.passwordHash) : false;
 
-  await registrarTentativaLogin(identificador, senhaValida);
+  await registrarTentativaLogin(email, senhaValida);
+  await registrarTentativaLogin(ip, senhaValida);
 
   if (!usuario || !senhaValida) {
     return { sucesso: false, mensagem: "E-mail ou senha inválidos." };
